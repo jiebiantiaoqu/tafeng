@@ -1,6 +1,6 @@
 # Tafeng
 
-Tafeng is a WebSSH workspace prototype designed for Cloudflare Workers. It is built with React, Vite, and TypeScript, with a reserved Rust SSH gateway for future real SSH/SFTP integration. It includes admin-password login, optional two-factor authentication, VPS connection management, a terminal workspace, file upload/download APIs, a text configuration editor, resource monitoring, process lists, multilingual UI, and global command history.
+Tafeng is a WebSSH workspace prototype designed for Cloudflare Workers. It is built with React, Vite, and TypeScript. The project now uses a pure Worker architecture: static frontend assets, authentication, settings, connection management, command history, file APIs, and WebSocket terminal bridging are all handled by Cloudflare Worker.
 
 Chinese documentation: [README.md](./README.md)
 
@@ -16,16 +16,13 @@ Chinese documentation: [README.md](./README.md)
 - Live CPU, memory, swap, disk usage, and process list panels.
 - Global command history across all VPS connections, up to 100000 entries.
 - Cloudflare Worker + KV + R2 deployment structure.
-- Reserved Rust gateway for real SSH/SFTP integration.
+- Future real SSH/SFTP integration is expected to use Worker TCP Socket.
 
 ## Current Status
 
 The project currently includes the frontend, Worker APIs, authentication, settings, connection management, command history, file APIs, and monitoring UI. Real SSH/SFTP protocol integration is isolated in [worker/sshBridge.ts](./worker/sshBridge.ts). The current implementation is a runnable development bridge.
 
-Recommended paths for real SSH integration:
-
-1. Implement Cloudflare Worker TCP Socket + SSH protocol support in `worker/sshBridge.ts`.
-2. Use [rust-gateway](./rust-gateway) as the real SSH/SFTP gateway while keeping the Worker as the auth, static asset, and edge entry point.
+The goal of Option A is to deploy only Cloudflare Worker, without a separate traditional backend. For real SSH support, implement the bridge in `worker/sshBridge.ts` using Cloudflare Workers' `cloudflare:sockets` TCP Socket API to connect to the VPS `22` port.
 
 ## Project Structure
 
@@ -34,9 +31,8 @@ tafeng/
 ├── src/                 # React + Vite + TypeScript frontend
 ├── worker/              # Cloudflare Worker APIs and WebSocket service
 ├── shared/              # Shared frontend/Worker types
-├── rust-gateway/        # Reserved Rust backend gateway
 ├── public/              # Static assets
-├── dist/client/         # Frontend build output
+├── dist/client/         # Frontend build output, not committed
 ├── wrangler.toml        # Cloudflare Worker config
 ├── package.json         # Frontend and Worker scripts
 └── LICENSE              # MIT License
@@ -48,7 +44,6 @@ tafeng/
 - npm 9 or newer.
 - A Cloudflare account.
 - Wrangler CLI. This project includes `wrangler` in devDependencies, so you can use `npm run worker:dev` and `npm run worker:deploy`.
-- Rust toolchain, only if you want to run or develop `rust-gateway/`.
 
 ## Local Development
 
@@ -227,6 +222,28 @@ You can bind a custom domain in the Cloudflare Dashboard:
 4. Open Settings.
 5. Add a custom domain or route under Domains & Routes.
 
+## Real SSH/SFTP Integration Path
+
+The Worker-side adapter lives here:
+
+```text
+worker/sshBridge.ts
+```
+
+For real SSH integration:
+
+1. Receive browser terminal input through the Worker WebSocket.
+2. Use `connect()` from `cloudflare:sockets` inside the Worker to open an outbound TCP connection to the VPS `host:22`.
+3. Implement or integrate SSH protocol handling inside the Worker.
+4. Pipe browser WebSocket data and SSH TCP Socket data in both directions.
+5. Implement SFTP in the same Worker adapter layer. Use R2 as temporary object storage when needed.
+
+Notes:
+
+- Workers can create outbound TCP connections, but they do not behave like traditional servers listening on arbitrary TCP ports.
+- Real SSH, SFTP, large files, and long-lived sessions must account for Worker limits, timeouts, memory, and concurrent open connections.
+- For 10 GB files, write to R2 first and process the transfer in chunks or tasks. Do not read the whole file into memory.
+
 ## Two-Factor Authentication
 
 The UI already includes a two-factor authentication switch and the login flow placeholder. In development mode, the placeholder code is:
@@ -265,10 +282,8 @@ Recommended flow after real SFTP integration:
 
 1. Browser uploads to the Worker.
 2. Worker streams the large file into a temporary R2 object.
-3. Rust gateway or SSH/SFTP adapter reads from R2 and uploads to the VPS.
+3. The Worker SSH/SFTP adapter reads from R2 and uploads to the VPS.
 4. Temporary R2 objects are deleted after completion.
-
-This avoids keeping an unstable long-running browser-to-Worker-to-VPS transfer open.
 
 ## Command History
 
@@ -306,43 +321,6 @@ To add a new language:
 2. Add a dictionary in `src/lib/i18n.ts`.
 3. Add an option in the language selector inside `SettingsPanel`.
 
-## Rust Gateway
-
-`rust-gateway/` is the reserved backend skeleton for real SSH/SFTP support.
-
-Run it with:
-
-```bash
-cd rust-gateway
-cargo run
-```
-
-Default address:
-
-```text
-http://127.0.0.1:9090
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:9090/health
-```
-
-Current gateway routes:
-
-- `/health`
-- `/ssh` WebSocket placeholder
-- `/sftp/upload` upload placeholder
-- `/sftp/download` download placeholder
-
-Recommended future work:
-
-- Integrate `russh` or a system `ssh` subprocess.
-- Implement streaming SFTP upload/download.
-- Add internal authentication between Worker and gateway.
-- Add task status callbacks and large-file progress reporting.
-
 ## Security Checklist
 
 Before production deployment:
@@ -376,10 +354,6 @@ npm run worker:dev
 
 # Deploy Worker
 npm run worker:deploy
-
-# Run Rust gateway
-cd rust-gateway
-cargo run
 ```
 
 ## FAQ
@@ -411,7 +385,7 @@ Make sure the R2 buckets exist and that `bucket_name` and `preview_bucket_name` 
 
 ### 4. The terminal does not connect to a real VPS yet.
 
-This is expected for the current prototype. Real SSH/SFTP needs to be implemented in [worker/sshBridge.ts](./worker/sshBridge.ts) or [rust-gateway](./rust-gateway).
+This is expected for the current prototype. Real SSH/SFTP needs to be implemented in [worker/sshBridge.ts](./worker/sshBridge.ts) using Worker TCP Socket and SSH protocol logic.
 
 ### 5. Is command history isolated by VPS?
 

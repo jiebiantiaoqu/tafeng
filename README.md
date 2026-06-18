@@ -1,6 +1,6 @@
 # 踏风 Tafeng
 
-踏风是一个面向 Cloudflare Worker 部署的 WebSSH 工作台原型，使用 React + Vite + TypeScript 构建，预留 Rust SSH 网关。它包含管理密码登录、两步验证设置、VPS 连接信息管理、终端工作台、文件上传下载、文本配置编辑器、资源监控、进程列表、多语言界面和全局命令历史记录。
+踏风是一个面向 Cloudflare Worker 部署的 WebSSH 工作台原型，使用 React + Vite + TypeScript 构建。项目采用纯 Worker 架构：前端静态资源、认证、设置、连接管理、命令历史、文件接口、WebSocket 终端桥接都由 Cloudflare Worker 承载。
 
 English documentation: [Readme_EN.md](./Readme_EN.md)
 
@@ -15,16 +15,13 @@ English documentation: [Readme_EN.md](./Readme_EN.md)
 - 连接后显示 CPU、内存、Swap、硬盘使用情况和进程列表。
 - 全局命令历史记录，所有 VPS 共用，最多保存 100000 条。
 - Cloudflare Worker + KV + R2 部署结构。
-- 预留 Rust 网关目录，方便后续接入真实 SSH/SFTP。
+- 后续真实 SSH/SFTP 接入统一走 Worker TCP Socket 方案。
 
 ## 当前状态说明
 
 当前项目已经完成前端、Worker API、认证、设置、连接管理、命令历史、文件接口和监控面板骨架。真实 SSH/SFTP 协议接入被隔离在 [worker/sshBridge.ts](./worker/sshBridge.ts)，目前是可运行的开发桥接模式。
 
-后续接入真实 SSH 有两种建议路线：
-
-1. 在 `worker/sshBridge.ts` 中接入 Cloudflare Worker TCP Socket 和 SSH 协议实现。
-2. 使用 [rust-gateway](./rust-gateway) 作为真实 SSH/SFTP 网关，Worker 负责鉴权、静态资源和边缘入口。
+方案 A 的目标是只部署 Cloudflare Worker，不额外部署传统后端。后续接入真实 SSH 时，建议在 `worker/sshBridge.ts` 中使用 Cloudflare Worker 的 `cloudflare:sockets` TCP Socket API 连接 VPS 的 `22` 端口，并在 Worker 内完成 SSH 协议桥接。
 
 ## 目录结构
 
@@ -33,9 +30,8 @@ tafeng/
 ├── src/                 # React + Vite + TypeScript 前端
 ├── worker/              # Cloudflare Worker API 与 WebSocket 服务
 ├── shared/              # 前后端共用类型
-├── rust-gateway/        # 预留 Rust 后端网关
 ├── public/              # 静态资源目录
-├── dist/client/         # 前端构建产物
+├── dist/client/         # 前端构建产物，不提交 Git
 ├── wrangler.toml        # Cloudflare Worker 配置
 ├── package.json         # 前端和 Worker 脚本
 └── LICENSE              # MIT License
@@ -47,7 +43,6 @@ tafeng/
 - npm 9 或更高版本。
 - Cloudflare 账号。
 - Wrangler CLI。本项目已把 `wrangler` 放在 devDependencies 中，可以直接使用 `npm run worker:dev` 和 `npm run worker:deploy`。
-- Rust 工具链，仅当你需要运行或开发 `rust-gateway/` 时需要。
 
 ## 本地开发
 
@@ -226,6 +221,28 @@ https://tafeng.your-subdomain.workers.dev
 4. 进入 Settings。
 5. 在 Domains & Routes 中添加自定义域名或路由。
 
+## 真实 SSH/SFTP 接入路线
+
+项目现在保留的是 Worker 内适配层：
+
+```text
+worker/sshBridge.ts
+```
+
+接入真实 SSH 时建议这样做：
+
+1. 在 Worker WebSocket 中接收浏览器终端输入。
+2. 在 Worker 内使用 `cloudflare:sockets` 的 `connect()` 创建到 VPS `host:22` 的出站 TCP 连接。
+3. 在 Worker 内实现或引入可用的 SSH 协议适配逻辑。
+4. 将浏览器 WebSocket 数据和 SSH TCP Socket 数据互相转发。
+5. SFTP 文件传输也走同一个 Worker 适配层，必要时配合 R2 做临时对象中转。
+
+注意事项：
+
+- Worker 只能创建出站 TCP 连接，不能像传统服务器一样监听任意 TCP 端口。
+- 真实 SSH 协议、SFTP、大文件传输和长连接要注意 Worker 限制、超时、内存和并发连接数量。
+- 10G 大文件建议先写入 R2，再由 Worker 分段处理或任务化处理，避免一次性读入内存。
+
 ## 两步验证
 
 当前界面已经提供两步验证开关，并完成了登录流程占位。开发模式下验证码占位为：
@@ -264,10 +281,8 @@ TAFENG_FILES
 
 1. 浏览器上传到 Worker。
 2. Worker 将大文件流式写入 R2 临时对象。
-3. Rust 网关或 SSH/SFTP 适配层从 R2 读取并上传到 VPS。
+3. Worker 的 SSH/SFTP 适配层从 R2 读取并上传到 VPS。
 4. 任务完成后删除临时对象。
-
-这样可以避免浏览器、Worker 和远端 VPS 之间长时间保持不稳定连接。
 
 ## 命令历史记录
 
@@ -305,43 +320,6 @@ src/lib/i18n.ts
 2. 在 `src/lib/i18n.ts` 中增加对应字典。
 3. 在 `SettingsPanel` 的语言选择器中增加选项。
 
-## Rust 网关
-
-`rust-gateway/` 是预留的真实 SSH/SFTP 后端骨架。
-
-运行方式：
-
-```bash
-cd rust-gateway
-cargo run
-```
-
-默认监听地址：
-
-```text
-http://127.0.0.1:9090
-```
-
-健康检查：
-
-```bash
-curl http://127.0.0.1:9090/health
-```
-
-当前 Rust 网关包含：
-
-- `/health`
-- `/ssh` WebSocket 占位接口
-- `/sftp/upload` 上传占位接口
-- `/sftp/download` 下载占位接口
-
-后续建议接入：
-
-- `russh` 或系统 `ssh` 子进程。
-- SFTP 流式上传下载。
-- 和 Worker 之间的内部鉴权。
-- 任务状态回调和大文件传输进度。
-
 ## 安全建议
 
 生产部署前建议完成以下事项：
@@ -375,10 +353,6 @@ npm run worker:dev
 
 # 部署 Worker
 npm run worker:deploy
-
-# 运行 Rust 网关
-cd rust-gateway
-cargo run
 ```
 
 ## 常见问题
@@ -410,7 +384,7 @@ npx wrangler kv namespace create TAFENG_KV --preview
 
 ### 4. 终端现在没有连接真实 VPS
 
-这是当前原型的预期行为。真实 SSH/SFTP 需要在 [worker/sshBridge.ts](./worker/sshBridge.ts) 或 [rust-gateway](./rust-gateway) 中接入。
+这是当前原型的预期行为。真实 SSH/SFTP 需要在 [worker/sshBridge.ts](./worker/sshBridge.ts) 中接入 Worker TCP Socket 和 SSH 协议逻辑。
 
 ### 5. 命令历史是否按 VPS 隔离
 

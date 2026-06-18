@@ -49,11 +49,6 @@ lerna-debug.log*
 coverage/
 .nyc_output/
 
-# Rust
-target/
-rust-gateway/target/
-**/*.rs.bk
-
 # Editor / IDE
 .idea/
 .vscode/*
