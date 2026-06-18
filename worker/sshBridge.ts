@@ -86,7 +86,19 @@ export function createSshBridge(socket: WebSocket, options: SshBridgeOptions): S
         passphrase: profile.credentialKind === "privateKey" ? profile.passphrase : undefined,
         readyTimeout: 20_000,
         keepaliveInterval: 15_000,
-        keepaliveCountMax: 3
+        keepaliveCountMax: 3,
+        // Workers nodejs_compat crypto doesn't fully support GCM auth tags or
+        // ChaCha20-Poly1305, so restrict to CTR/CBC ciphers + HMAC MACs.
+        algorithms: {
+          cipher: [
+            "aes128-ctr", "aes192-ctr", "aes256-ctr",
+            "aes128-cbc", "aes256-cbc", "3des-cbc"
+          ],
+          hmac: [
+            "hmac-sha2-256", "hmac-sha2-512",
+            "hmac-sha1"
+          ]
+        }
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : copy.unknownError;
