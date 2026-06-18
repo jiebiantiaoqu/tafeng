@@ -547,6 +547,79 @@ select:focus {
   width: auto;
 }
 
+.two-factor-button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #303030;
+  border-radius: 6px;
+  background: #121212;
+  color: inherit;
+  padding: 0 10px;
+}
+
+.totp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(0 0 0 / 62%);
+}
+
+.totp-dialog {
+  width: min(420px, calc(100vw - 32px));
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #0d0d0d;
+  padding: 18px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+}
+
+.totp-dialog p {
+  margin: 0 0 14px;
+  color: #b8b8b8;
+}
+
+.totp-dialog img,
+.qr-placeholder {
+  width: 220px;
+  height: 220px;
+  display: block;
+  margin: 0 auto 14px;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.totp-dialog input[readonly] {
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #303030;
+  border-radius: 6px;
+  background: #121212;
+  color: inherit;
+  padding: 11px 14px;
+  font-weight: 700;
+}
+
+.dialog-actions .secondary-button {
+  width: auto;
+}
+
 .light .app-header,
 .light .side-panel,
 .light .monitor-panel,
@@ -564,10 +637,17 @@ select:focus {
 .light .file-list button,
 .light .process-row,
 .light .icon-toggle,
-.light .editor-toolbar button {
+.light .editor-toolbar button,
+.light .two-factor-button,
+.light .ghost-button {
   background: #f7f7f7;
   border-color: #dadada;
   color: #111;
+}
+
+.light .totp-dialog {
+  background: #fff;
+  border-color: #dedede;
 }
 
 @media (max-width: 1120px) {

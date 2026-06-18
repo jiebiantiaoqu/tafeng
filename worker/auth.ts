@@ -1,5 +1,6 @@
 import type { Env } from "./storage";
-import { createSession, getSettings } from "./storage";
+import { createSession, getSettings, getTotpSecret } from "./storage";
+import { verifyTotp } from "./totp";
 
 export function getCookie(request: Request, name: string) {
   const cookie = request.headers.get("Cookie") ?? "";
@@ -19,7 +20,7 @@ export async function handleLogin(request: Request, env: Env) {
     return json({ message: "管理密码错误" }, 401);
   }
 
-  if (settings.twoFactorEnabled && body.otp !== "000000") {
+  if (settings.twoFactorEnabled && !(await verifyTotp(body.otp, await getTotpSecret(env)))) {
     return json({ twoFactorRequired: true, message: "请输入两步验证码" }, 401);
   }
 

@@ -459,18 +459,29 @@ Notes:
 
 ## Two-Factor Authentication
 
-The UI already includes a two-factor authentication switch and the login flow placeholder. In development mode, the placeholder code is:
+Tafeng now supports TOTP-based two-factor authentication and provides a QR code in the web UI.
 
-```text
-000000
-```
+Enable it with:
 
-For production, integrate a standard TOTP flow:
+1. Log in to the Tafeng console.
+2. Click `Enable two-factor auth` in the top settings bar.
+3. The page will show a QR code and a manual secret.
+4. Scan the QR code with Google Authenticator, Microsoft Authenticator, 1Password, Bitwarden, or another TOTP-compatible app.
+5. Enter the 6-digit code shown in the Authenticator app.
+6. Click `Confirm enable`.
 
-- Generate a TOTP secret for the administrator.
-- Bind it through a QR code in an Authenticator app.
-- Verify TOTP in the Worker login logic.
-- Store the TOTP secret encrypted in KV or as a Worker Secret.
+After enabling it, login requires both:
+
+- Admin password
+- The 6-digit dynamic code from your Authenticator app
+
+Disable it with:
+
+1. Log in to the Tafeng console.
+2. Click `Two-factor auth enabled` in the top settings bar.
+3. The Worker clears the saved TOTP secret and disables two-factor authentication.
+
+The TOTP secret is stored in `TAFENG_KV`. During setup, Tafeng stores a pending secret that expires after 10 minutes. The secret is only activated after the verification code succeeds.
 
 Related files:
 
@@ -539,7 +550,7 @@ To add a new language:
 Before production deployment:
 
 - Set a strong admin password with `npx wrangler secret put ADMIN_PASSWORD`.
-- Integrate real TOTP two-factor authentication.
+- Enable two-factor authentication and keep your Authenticator recovery method safe.
 - Do not store SSH passwords or private keys in plaintext long term.
 - Add encryption for VPS credentials stored in KV.
 - Restrict Worker access or add additional access control if needed.

@@ -5,14 +5,19 @@ import {
   appendCommandHistory,
   clearSession,
   clearCommandHistory,
+  disableTotp,
+  enableTotp,
+  getPendingTotpSecret,
   getSettings,
   isValidSession,
   listCommandHistory,
   listConnections,
+  savePendingTotpSecret,
   saveConnections,
   saveSettings,
   type Env
 } from "./storage";
+import { createOtpAuthUrl, generateTotpSecret, verifyTotp } from "./totp";
 
 const TEN_GB = 10 * 1024 * 1024 * 1024;
 
@@ -42,9 +47,34 @@ export default {
       if (request.method === "GET") return json(await getSettings(env));
       if (request.method === "PUT") {
         const settings = await request.json<AppSettings>();
-        await saveSettings(env, settings);
-        return json(settings);
+        const currentSettings = await getSettings(env);
+        const nextSettings: AppSettings = {
+          ...currentSettings,
+          theme: settings.theme,
+          language: settings.language
+        };
+        await saveSettings(env, nextSettings);
+        return json(nextSettings);
       }
+    }
+
+    if (url.pathname === "/api/totp/setup" && request.method === "POST") {
+      const secret = generateTotpSecret();
+      await savePendingTotpSecret(env, secret);
+      return json({ secret, otpauthUrl: createOtpAuthUrl(secret) });
+    }
+
+    if (url.pathname === "/api/totp/verify" && request.method === "POST") {
+      const body = await request.json<{ code?: string }>();
+      const pendingSecret = await getPendingTotpSecret(env);
+      if (!(await verifyTotp(body.code, pendingSecret))) return json({ message: "验证码无效或已过期" }, 400);
+      await enableTotp(env, pendingSecret!);
+      return json(await getSettings(env));
+    }
+
+    if (url.pathname === "/api/totp/disable" && request.method === "POST") {
+      await disableTotp(env);
+      return json(await getSettings(env));
     }
 
     if (url.pathname === "/api/connections") {
@@ -87,6 +117,7 @@ export default {
       if (length > TEN_GB) return json({ message: "文件超过 10G 限制" }, 413);
       const key = `uploads/${crypto.randomUUID()}`;
       if (!request.body) return json({ message: "上传内容为空" }, 400);
+      if (!env.TAFENG_FILES) return json({ message: "R2 绑定 TAFENG_FILES 未配置" }, 500);
       await env.TAFENG_FILES.put(key, request.body, { httpMetadata: { contentType: request.headers.get("Content-Type") ?? undefined } });
       return json({ key, maxSize: TEN_GB });
     }

@@ -458,18 +458,29 @@ worker/sshBridge.ts
 
 ## 两步验证
 
-当前界面已经提供两步验证开关，并完成了登录流程占位。开发模式下验证码占位为：
+踏风已经支持基于 TOTP 的两步验证，并会在网页里提供二维码。
 
-```text
-000000
-```
+启用步骤：
 
-生产环境建议后续接入标准 TOTP：
+1. 登录踏风控制台。
+2. 点击顶部设置栏中的 `启用两步验证`。
+3. 页面会弹出二维码和手动密钥。
+4. 使用 Google Authenticator、Microsoft Authenticator、1Password、Bitwarden 等支持 TOTP 的应用扫描二维码。
+5. 在弹窗中输入 Authenticator 应用显示的 6 位验证码。
+6. 点击 `确认启用`。
 
-- 为管理员生成 TOTP Secret。
-- 用二维码绑定 Authenticator 应用。
-- 在 Worker 登录逻辑中校验 TOTP。
-- 把 TOTP Secret 加密后保存到 KV 或放入 Secret。
+启用后，之后登录需要同时输入：
+
+- 管理密码
+- Authenticator 应用中的 6 位动态验证码
+
+关闭步骤：
+
+1. 登录踏风控制台。
+2. 点击顶部设置栏中的 `两步验证已启用`。
+3. Worker 会清除已保存的 TOTP 密钥，并关闭两步验证。
+
+TOTP 密钥会保存在 `TAFENG_KV` 中。生成二维码时会先保存一个 10 分钟有效的待确认密钥，只有验证码校验通过后才会正式启用。
 
 相关入口在：
 
@@ -538,7 +549,7 @@ src/lib/i18n.ts
 生产部署前建议完成以下事项：
 
 - 设置强管理密码：`npx wrangler secret put ADMIN_PASSWORD`。
-- 接入真实 TOTP 两步验证。
+- 启用两步验证，并妥善保存 Authenticator 恢复方式。
 - 不要明文长期保存 SSH 密码或私钥，建议使用加密存储。
 - 为 KV 中保存的 VPS 凭据增加加密层。
 - 限制 Worker 访问来源或增加额外访问控制。

@@ -28,6 +28,9 @@ export const api = {
   authState: () => request<{ authenticated: boolean }>("/api/auth/state"),
   settings: () => request<AppSettings>("/api/settings"),
   saveSettings: (settings: AppSettings) => request<AppSettings>("/api/settings", { method: "PUT", body: JSON.stringify(settings) }),
+  setupTotp: () => request<{ secret: string; otpauthUrl: string }>("/api/totp/setup", { method: "POST" }),
+  verifyTotp: (code: string) => request<AppSettings>("/api/totp/verify", { method: "POST", body: JSON.stringify({ code }) }),
+  disableTotp: () => request<AppSettings>("/api/totp/disable", { method: "POST" }),
   connections: () => request<ServerProfile[]>("/api/connections"),
   createConnection: (profile: Omit<ServerProfile, "id" | "createdAt" | "updatedAt">) =>
     request<ServerProfile>("/api/connections", { method: "POST", body: JSON.stringify(profile) }),
