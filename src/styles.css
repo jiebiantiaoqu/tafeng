@@ -218,31 +218,63 @@ select:focus {
 }
 
 .connection-item {
-  position: relative;
   display: grid;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  text-align: left;
   border: 1px solid #292929;
   border-radius: 6px;
   background: #121212;
   color: inherit;
-  padding: 10px 34px 10px 10px;
+  padding: 8px;
 }
 
 .connection-item.active {
   border-color: #78dce8;
 }
 
+.connection-main {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 2px;
+  text-align: left;
+}
+
+.connection-main span,
+.connection-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .connection-item small {
   color: #9b9b9b;
 }
 
-.connection-item svg {
-  position: absolute;
-  right: 10px;
-  top: 12px;
+.connection-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.connection-actions button,
+.inline-icon-button {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #303030;
+  border-radius: 6px;
+  background: #171717;
   color: #a6a6a6;
+}
+
+.inline-icon-button {
+  margin-left: auto;
 }
 
 .connection-form {
@@ -639,7 +671,9 @@ select:focus {
 .light .icon-toggle,
 .light .editor-toolbar button,
 .light .two-factor-button,
-.light .ghost-button {
+.light .ghost-button,
+.light .connection-actions button,
+.light .inline-icon-button {
   background: #f7f7f7;
   border-color: #dadada;
   color: #111;

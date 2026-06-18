@@ -23,6 +23,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(fallbackSettings);
   const [profiles, setProfiles] = useState<ServerProfile[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [metrics, setMetrics] = useState<ServerMetrics>();
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
@@ -54,10 +55,21 @@ export default function App() {
     setProcesses(nextProcesses);
   }, []);
 
+  function connectProfile(id: string) {
+    setSelectedId(id);
+    setConnectionAttempt((attempt) => attempt + 1);
+  }
+
   async function createConnection(profile: Omit<ServerProfile, "id" | "createdAt" | "updatedAt">) {
     const created = await api.createConnection(profile);
     setProfiles((current) => [created, ...current]);
-    setSelectedId(created.id);
+    connectProfile(created.id);
+  }
+
+  async function updateConnection(profile: ServerProfile) {
+    const updated = await api.updateConnection(profile);
+    setProfiles((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    connectProfile(updated.id);
   }
 
   async function deleteConnection(id: string) {
@@ -101,8 +113,9 @@ export default function App() {
         <ConnectionPanel
           profiles={profiles}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={connectProfile}
           onCreate={createConnection}
+          onUpdate={updateConnection}
           onDelete={deleteConnection}
           t={t}
         />
@@ -113,7 +126,9 @@ export default function App() {
           </div>
           <TerminalPane
             profileId={selectedId}
+            connectionAttempt={connectionAttempt}
             language={settings.language}
+            connectingLabel={t("connecting")}
             onMetrics={handleMetrics}
             onCommandSubmitted={() => setHistoryRefreshKey((key) => key + 1)}
           />

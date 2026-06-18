@@ -1,4 +1,4 @@
-import { KeyRound, Plus, Server, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Plus, Server, Trash2, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 import type { ServerProfile } from "../../shared/types";
 import type { TFunction } from "../lib/i18n";
@@ -9,16 +9,47 @@ type Props = {
   selectedId?: string;
   onSelect: (id: string) => void;
   onCreate: (profile: Omit<ServerProfile, "id" | "createdAt" | "updatedAt">) => void;
+  onUpdate: (profile: ServerProfile) => void;
   onDelete: (id: string) => void;
   t: TFunction;
 };
 
-export function ConnectionPanel({ profiles, selectedId, onSelect, onCreate, onDelete, t }: Props) {
+export function ConnectionPanel({ profiles, selectedId, onSelect, onCreate, onUpdate, onDelete, t }: Props) {
   const [draft, setDraft] = useState(emptyProfile);
+  const [editingProfile, setEditingProfile] = useState<ServerProfile | null>(null);
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (editingProfile) {
+      onUpdate({
+        ...editingProfile,
+        ...draft
+      });
+      setEditingProfile(null);
+      setDraft({ ...emptyProfile, name: t("newVps") });
+      return;
+    }
     onCreate(draft);
+    setDraft({ ...emptyProfile, name: t("newVps") });
+  }
+
+  function startEdit(profile: ServerProfile) {
+    setEditingProfile(profile);
+    setDraft({
+      name: profile.name,
+      host: profile.host,
+      port: profile.port,
+      username: profile.username,
+      credentialKind: profile.credentialKind,
+      password: profile.password ?? "",
+      privateKey: profile.privateKey ?? "",
+      passphrase: profile.passphrase ?? ""
+    });
+    onSelect(profile.id);
+  }
+
+  function cancelEdit() {
+    setEditingProfile(null);
     setDraft({ ...emptyProfile, name: t("newVps") });
   }
 
@@ -30,30 +61,47 @@ export function ConnectionPanel({ profiles, selectedId, onSelect, onCreate, onDe
       </div>
       <div className="connection-list">
         {profiles.map((profile) => (
-          <button
-            key={profile.id}
-            className={profile.id === selectedId ? "connection-item active" : "connection-item"}
-            onClick={() => onSelect(profile.id)}
-            type="button"
-          >
-            <span>{profile.name}</span>
-            <small>
-              {profile.username}@{profile.host}:{profile.port}
-            </small>
-            <Trash2
-              size={15}
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete(profile.id);
-              }}
-            />
-          </button>
+          <div key={profile.id} className={profile.id === selectedId ? "connection-item active" : "connection-item"}>
+            <button className="connection-main" onClick={() => onSelect(profile.id)} type="button">
+              <span>{profile.name}</span>
+              <small>
+                {profile.username}@{profile.host}:{profile.port}
+              </small>
+            </button>
+            <span className="connection-actions">
+              <button
+                type="button"
+                aria-label={t("editConnection")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  startEdit(profile);
+                }}
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label={t("deleteConnection")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(profile.id);
+                }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </span>
+          </div>
         ))}
       </div>
       <form className="connection-form" onSubmit={submit}>
         <div className="panel-title compact">
-          <Plus size={16} />
-          <span>{t("saveVps")}</span>
+          {editingProfile ? <Pencil size={16} /> : <Plus size={16} />}
+          <span>{editingProfile ? t("editConnection") : t("saveVps")}</span>
+          {editingProfile ? (
+            <button className="inline-icon-button" type="button" title={t("cancel")} onClick={cancelEdit}>
+              <X size={15} />
+            </button>
+          ) : null}
         </div>
         <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder={t("name")} />
         <input value={draft.host} onChange={(event) => setDraft({ ...draft, host: event.target.value })} placeholder={t("host")} />
@@ -91,7 +139,7 @@ export function ConnectionPanel({ profiles, selectedId, onSelect, onCreate, onDe
         )}
         <button className="secondary-button" type="submit">
           <KeyRound size={16} />
-          {t("saveConnection")}
+          {editingProfile ? t("updateConnection") : t("saveConnection")}
         </button>
       </form>
     </aside>

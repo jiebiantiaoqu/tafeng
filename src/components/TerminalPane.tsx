@@ -6,12 +6,14 @@ import type { Language, ProcessInfo, ServerMetrics, TerminalMessage } from "../.
 
 type Props = {
   profileId?: string;
+  connectionAttempt: number;
   language: Language;
+  connectingLabel: string;
   onMetrics: (metrics: ServerMetrics, processes: ProcessInfo[]) => void;
   onCommandSubmitted?: () => void;
 };
 
-export function TerminalPane({ profileId, language, onMetrics, onCommandSubmitted }: Props) {
+export function TerminalPane({ profileId, connectionAttempt, language, connectingLabel, onMetrics, onCommandSubmitted }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -49,6 +51,7 @@ export function TerminalPane({ profileId, language, onMetrics, onCommandSubmitte
     if (!terminal || !profileId) return;
 
     terminal.clear();
+    terminal.writeln(connectingLabel);
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const socket = new WebSocket(
       `${protocol}://${window.location.host}/ws/terminal?profileId=${encodeURIComponent(profileId)}&language=${language}`
@@ -74,7 +77,7 @@ export function TerminalPane({ profileId, language, onMetrics, onCommandSubmitte
       inputDisposable.dispose();
       socket.close();
     };
-  }, [language, onCommandSubmitted, onMetrics, profileId]);
+  }, [connectingLabel, connectionAttempt, language, onCommandSubmitted, onMetrics, profileId]);
 
   return (
     <section className="terminal-wrap">
