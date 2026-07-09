@@ -485,7 +485,7 @@ export function createSshBridge(socket: WebSocket, options: SshBridgeOptions): S
 }
 
 function createTcpAddress(host: string, port: number) {
-  if (isIpv6Literal(host)) return `tcp://[${host}]:${port}`;
+  if (isIpv6Literal(host)) return `[${host}]:${port}`;
   return { hostname: host, port };
 }
 
